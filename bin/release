@@ -1,0 +1,154 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Release script for ScriptTracker gem
+# Usage: bin/release [version]
+# Example: bin/release 0.1.0
+
+require 'bundler/setup'
+require 'fileutils'
+
+def run_command(cmd, description)
+  puts "\n#{description}..."
+  puts "Running: #{cmd}"
+  system(cmd) || abort("Failed: #{description}")
+end
+
+def check_git_clean
+  unless system('git diff --quiet && git diff --cached --quiet')
+    abort('ERROR: You have uncommitted changes. Please commit or stash them first.')
+  end
+end
+
+def check_git_remote
+  unless system('git remote get-url origin > /dev/null 2>&1')
+    puts 'WARNING: No git remote "origin" found. Skipping git push.'
+    return false
+  end
+  true
+end
+
+def update_version_file(version)
+  version_file = 'lib/script_tracker/version.rb'
+  content = File.read(version_file)
+  new_content = content.gsub(/VERSION = "[\d.]+"/, "VERSION = \"#{version}\"")
+  File.write(version_file, new_content)
+  puts "Updated version to #{version} in #{version_file}"
+end
+
+def update_changelog(version)
+  changelog_file = 'CHANGELOG.md'
+  content = File.read(changelog_file)
+
+  # Check if version already exists
+  if content.include?("## [#{version}]")
+    puts "WARNING: Version #{version} already exists in CHANGELOG.md"
+    return
+  end
+
+  # Add new version entry
+  date = Time.now.strftime('%Y-%m-%d')
+  new_entry = <<~CHANGELOG
+    ## [Unreleased]
+
+    ## [#{version}] - #{date}
+
+    ### Added
+    - Release #{version}
+
+  CHANGELOG
+
+  content.gsub!(/## \[Unreleased\]/, new_entry)
+  File.write(changelog_file, content)
+  puts "Updated CHANGELOG.md with version #{version}"
+end
+
+def commit_and_tag(version)
+  run_command("git add lib/script_tracker/version.rb CHANGELOG.md", 'Staging version files')
+  run_command("git commit -m \"Bump version to #{version}\"", 'Committing version bump')
+  run_command("git tag -a v#{version} -m \"Release version #{version}\"", 'Creating git tag')
+end
+
+def push_to_git(version)
+  if check_git_remote
+    run_command('git push origin main', 'Pushing to git')
+    run_command("git push origin v#{version}", 'Pushing tag to git')
+  end
+end
+
+def build_gem
+  run_command('bundle exec rake build', 'Building gem')
+end
+
+def push_to_rubygems
+  gem_file = Dir.glob('pkg/script_tracker-*.gem').sort.last
+  unless gem_file
+    abort('ERROR: No gem file found in pkg/ directory')
+  end
+
+  puts "\nPushing #{File.basename(gem_file)} to RubyGems..."
+  run_command("gem push #{gem_file}", 'Pushing to RubyGems')
+end
+
+def verify_tests
+  puts "\nRunning tests..."
+  unless system('bundle exec rspec')
+    abort('ERROR: Tests failed! Aborting release.')
+  end
+  puts 'All tests passed! ✅'
+end
+
+# Main execution
+if ARGV.empty?
+  puts 'Usage: bin/release [version]'
+  puts 'Example: bin/release 0.1.1'
+  exit 1
+end
+
+version = ARGV[0]
+
+# Validate version format
+unless version.match?(/^\d+\.\d+\.\d+/)
+  abort("ERROR: Invalid version format. Use semantic versioning (e.g., 0.1.1)")
+end
+
+puts "=" * 60
+puts "Releasing ScriptTracker v#{version}"
+puts "=" * 60
+
+# Pre-release checks
+check_git_clean
+verify_tests
+
+# Update files
+update_version_file(version)
+update_changelog(version)
+
+# Build and test
+build_gem
+
+# Confirm before pushing
+puts "\n" + "=" * 60
+puts "Ready to release v#{version}"
+puts "=" * 60
+print "Push to RubyGems? (yes/no): "
+response = STDIN.gets.chomp.downcase
+
+unless response == 'yes' || response == 'y'
+  puts 'Release cancelled.'
+  exit 0
+end
+
+# Git operations
+commit_and_tag(version)
+push_to_git(version)
+
+# Push to RubyGems
+push_to_rubygems
+
+puts "\n" + "=" * 60
+puts "✅ Successfully released ScriptTracker v#{version}!"
+puts "=" * 60
+puts "\nGem URL: https://rubygems.org/gems/script_tracker"
+puts "Install: gem install script_tracker"
+puts "\n"

@@ -1,0 +1,129 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g., 0.1.1)"
+        required: true
+        type: string
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ruby-version: ["3.2", "3.3"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby-version }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+          bundler-cache: false
+
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install --jobs 4 --retry 3
+
+      - name: Run tests
+        run: bundle exec rspec
+
+  release:
+    name: Build + Publish
+    needs: test
+    runs-on: ubuntu-latest
+    if: success()
+
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: false
+
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install
+
+      - name: Update version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          ruby -i -pe "gsub(/VERSION = \".*\"/, \"VERSION = \\\"$VERSION\\\"\")" lib/script_tracker/version.rb
+          echo "Updated version to $VERSION"
+          cat lib/script_tracker/version.rb
+
+      - name: Update CHANGELOG
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+          ruby -i -pe "gsub(/## \[Unreleased\]/, \"## [Unreleased]\\n\\n## [$VERSION] - $DATE\\n\\n### Added\\n- Release $VERSION\\n\")" CHANGELOG.md
+          echo "Updated CHANGELOG.md"
+
+      - name: Run tests again
+        run: bundle exec rspec
+
+      - name: Build gem
+        run: |
+          bundle exec rake build
+          echo "GEM_FILE=$(ls pkg/script_tracker-*.gem | head -1)" >> $GITHUB_ENV
+
+      - name: Create git tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add lib/script_tracker/version.rb CHANGELOG.md
+          git commit -m "Bump version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
+          git tag -a "v${{ github.event.inputs.version }}" -m "Release version ${{ github.event.inputs.version }}"
+
+      - name: Push to git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
+          git push origin main || echo "Nothing to push"
+          git push origin "v${{ github.event.inputs.version }}"
+
+      - name: Publish to RubyGems
+        run: |
+          mkdir -p $HOME/.gem
+          touch $HOME/.gem/credentials
+          chmod 0600 $HOME/.gem/credentials
+          printf -- "---\n:rubygems_api_key: ${RUBYGEMS_AUTH_TOKEN}\n" > $HOME/.gem/credentials
+          gem push ${{ env.GEM_FILE }}
+        env:
+          RUBYGEMS_AUTH_TOKEN: ${{ secrets.RUBYGEMS_AUTH_TOKEN }}
+
+      - name: Upload gem artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: script_tracker-gem
+          path: ${{ env.GEM_FILE }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: Release ${{ github.event.inputs.version }}
+          body: |
+            ## ScriptTracker ${{ github.event.inputs.version }}
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

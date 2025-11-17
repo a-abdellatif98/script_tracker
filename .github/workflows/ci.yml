@@ -1,0 +1,124 @@
+name: CI/CD
+
+on:
+  push:
+    tags:
+      - "v*" # Only run on version tags like v1.1.0
+    branches: [main] # Also run tests on main branch pushes
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        ruby-version: ["3.2", "3.3"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Ruby ${{ matrix.ruby-version }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby-version }}
+          bundler-cache: false
+
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install --jobs 4 --retry 3
+
+      - name: Run tests
+        run: bundle exec rspec
+
+  build:
+    name: Build + Publish
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all history for tags
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.2"
+          bundler-cache: false
+
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install
+
+      - name: Extract version from tag
+        id: version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Verify version matches gemspec
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          GEMSPEC_VERSION=$(ruby -e "require_relative 'lib/script_tracker/version'; puts ScriptTracker::VERSION")
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          if [ "$GEMSPEC_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: Version mismatch!"
+            echo "Gemspec version: $GEMSPEC_VERSION"
+            echo "Tag version: $TAG_VERSION"
+            exit 1
+          fi
+          echo "Version verified: $GEMSPEC_VERSION"
+
+      - name: Run tests
+        run: bundle exec rspec
+
+      - name: Build gem
+        run: |
+          bundle exec rake build
+          echo "GEM_FILE=$(ls pkg/script_tracker-*.gem | head -1)" >> $GITHUB_ENV
+
+      - name: Publish to RubyGems
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p $HOME/.gem
+          touch $HOME/.gem/credentials
+          chmod 0600 $HOME/.gem/credentials
+          printf -- "---\n:rubygems_api_key: ${RUBYGEMS_AUTH_TOKEN}\n" > $HOME/.gem/credentials
+          gem push ${{ env.GEM_FILE }}
+        env:
+          RUBYGEMS_AUTH_TOKEN: ${{ secrets.RUBYGEMS_AUTH_TOKEN }}
+
+      - name: Upload gem artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: script_tracker-gem
+          path: ${{ env.GEM_FILE }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            ## ScriptTracker ${{ steps.version.outputs.version }}
+
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
