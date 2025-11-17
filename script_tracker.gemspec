@@ -9,8 +9,9 @@ Gem::Specification.new do |spec|
   spec.email = ['ahmed.abdelatife@gmail.com']
 
   spec.summary = 'A Ruby gem for tracking and managing one-off script executions in Rails applications'
-  spec.description = 'ScriptTracker provides a migration-like system for managing one-off scripts with execution tracking, ' \
-                     'transaction support, and built-in logging. Perfect for data migrations, cleanup tasks, and administrative scripts.'
+  spec.description = 'ScriptTracker provides a migration-like system for managing one-off scripts with ' \
+                     'execution tracking, transaction support, and built-in logging. Perfect for data ' \
+                     'migrations, cleanup tasks, and administrative scripts.'
   spec.homepage = 'https://github.com/a-abdellatif98/script_tracker'
   spec.license = 'MIT'
   spec.required_ruby_version = '>= 2.7.0'
@@ -18,6 +19,7 @@ Gem::Specification.new do |spec|
   spec.metadata['homepage_uri'] = spec.homepage
   spec.metadata['source_code_uri'] = 'https://github.com/a-abdellatif98/script_tracker'
   spec.metadata['changelog_uri'] = 'https://github.com/a-abdellatif98/script_tracker/blob/main/CHANGELOG.md'
+  spec.metadata['rubygems_mfa_required'] = 'true'
 
   # Specify which files should be added to the gem when it is released.
   spec.files = Dir.glob([

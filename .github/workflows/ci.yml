@@ -32,6 +32,9 @@ jobs:
           gem install bundler
           bundle install --jobs 4 --retry 3
 
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
       - name: Run tests
         run: bundle exec rspec
 
@@ -81,6 +84,9 @@ jobs:
             exit 1
           fi
           echo "Version verified: $GEMSPEC_VERSION"
+
+      - name: Run RuboCop
+        run: bundle exec rubocop
 
       - name: Run tests
         run: bundle exec rspec

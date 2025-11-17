@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
-require "script_tracker/version"
-require "script_tracker/base"
-require "script_tracker/executed_script"
-require "script_tracker/railtie" if defined?(Rails::Railtie)
+require 'script_tracker/version'
+require 'script_tracker/base'
+require 'script_tracker/executed_script'
+require 'script_tracker/railtie' if defined?(Rails::Railtie)
 
 # Load generators for Rails
 if defined?(Rails)
-  require "rails/generators"
-  require_relative "script_tracker/generators/install_generator"
+  require 'rails/generators'
+  require_relative 'script_tracker/generators/install_generator'
 end
 
 module ScriptTracker

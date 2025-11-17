@@ -74,6 +74,9 @@ jobs:
           ruby -i -pe "gsub(/## \[Unreleased\]/, \"## [Unreleased]\\n\\n## [$VERSION] - $DATE\\n\\n### Added\\n- Release $VERSION\\n\")" CHANGELOG.md
           echo "Updated CHANGELOG.md"
 
+      - name: Run RuboCop
+        run: bundle exec rubocop
+
       - name: Run tests again
         run: bundle exec rspec
 

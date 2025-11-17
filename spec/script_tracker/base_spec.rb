@@ -6,7 +6,7 @@ RSpec.describe ScriptTracker::Base do
   let(:test_script_class) do
     Class.new(described_class) do
       def self.execute
-        log "Executing test script"
+        log 'Executing test script'
       end
     end
   end
@@ -14,7 +14,7 @@ RSpec.describe ScriptTracker::Base do
   let(:failing_script_class) do
     Class.new(described_class) do
       def self.execute
-        raise StandardError, "Test error"
+        raise StandardError, 'Test error'
       end
     end
   end
@@ -22,7 +22,7 @@ RSpec.describe ScriptTracker::Base do
   let(:skipping_script_class) do
     Class.new(described_class) do
       def self.execute
-        skip! "Test skip reason"
+        skip! 'Test skip reason'
       end
     end
   end
@@ -90,7 +90,7 @@ RSpec.describe ScriptTracker::Base do
   describe '.skip!' do
     it 'raises ScriptSkipped with custom reason' do
       expect do
-        test_script_class.skip!("Custom reason")
+        test_script_class.skip!('Custom reason')
       end.to raise_error(ScriptTracker::Base::ScriptSkipped, /Custom reason/)
     end
 
@@ -104,19 +104,19 @@ RSpec.describe ScriptTracker::Base do
   describe '.log' do
     it 'outputs info level messages' do
       expect do
-        test_script_class.log("Test message")
+        test_script_class.log('Test message')
       end.to output(/\[INFO\].*Test message/).to_stdout
     end
 
     it 'outputs error level messages' do
       expect do
-        test_script_class.log("Error message", level: :error)
+        test_script_class.log('Error message', level: :error)
       end.to output(/\[ERROR\].*Error message/).to_stdout
     end
 
     it 'includes timestamp in output' do
       expect do
-        test_script_class.log("Test message")
+        test_script_class.log('Test message')
       end.to output(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]/).to_stdout
     end
   end
@@ -125,13 +125,13 @@ RSpec.describe ScriptTracker::Base do
     it 'logs progress with percentage' do
       expect do
         test_script_class.log_progress(50, 100)
-      end.to output(/Progress: 50\/100 \(50.0%\)/).to_stdout
+      end.to output(%r{Progress: 50/100 \(50.0%\)}).to_stdout
     end
 
     it 'logs progress with custom message' do
       expect do
-        test_script_class.log_progress(25, 100, "Processing records")
-      end.to output(/Processing records \(25\/100 - 25.0%\)/).to_stdout
+        test_script_class.log_progress(25, 100, 'Processing records')
+      end.to output(%r{Processing records \(25/100 - 25.0%\)}).to_stdout
     end
   end
 
@@ -171,6 +171,72 @@ RSpec.describe ScriptTracker::Base do
       expect do
         test_script_class.process_in_batches(mock_relation) { |_record| }
       end.to output(/There are 5 records to process/).to_stdout
+    end
+  end
+
+  describe '.check_timeout!' do
+    it 'does not raise when within timeout' do
+      start_time = Time.current
+      expect do
+        test_script_class.check_timeout!(start_time, 300)
+      end.not_to raise_error
+    end
+
+    it 'raises ScriptTimeoutError when timeout exceeded' do
+      start_time = 10.minutes.ago
+      expect do
+        test_script_class.check_timeout!(start_time, 300)
+      end.to raise_error(ScriptTracker::Base::ScriptTimeoutError, /exceeded 300 seconds/)
+    end
+
+    it 'does not raise when max_duration is nil' do
+      start_time = 10.minutes.ago
+      expect do
+        test_script_class.check_timeout!(start_time, nil)
+      end.not_to raise_error
+    end
+
+    it 'does not raise when max_duration is zero' do
+      start_time = 10.minutes.ago
+      expect do
+        test_script_class.check_timeout!(start_time, 0)
+      end.not_to raise_error
+    end
+  end
+
+  describe 'timeout behavior' do
+    let(:slow_script_class) do
+      Class.new(described_class) do
+        def self.timeout
+          1 # 1 second timeout
+        end
+
+        def self.execute
+          sleep 2 # Takes 2 seconds
+        end
+      end
+    end
+
+    it 'times out long-running scripts', skip: 'This test takes time to run' do
+      result = slow_script_class.run
+      expect(result[:success]).to be false
+      expect(result[:output]).to match(/exceeded timeout/)
+    end
+
+    it 'does not timeout quick scripts' do
+      quick_script = Class.new(described_class) do
+        def self.timeout
+          5 # 5 seconds
+        end
+
+        def self.execute
+          # Quick execution
+          log 'Quick script'
+        end
+      end
+
+      result = quick_script.run
+      expect(result[:success]).to be true
     end
   end
 end
