@@ -9,7 +9,7 @@ module ScriptTracker
       Dir.glob("#{path}/../../tasks/**/*.rake").each { |f| load f }
     end
 
-    initializer "script_tracker.configure" do |app|
+    initializer 'script_tracker.configure' do |app|
       app.config.script_tracker = ActiveSupport::OrderedOptions.new
       app.config.script_tracker.scripts_path = app.root.join('lib', 'scripts')
     end

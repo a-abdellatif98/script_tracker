@@ -274,4 +274,99 @@ RSpec.describe ScriptTracker::ExecutedScript do
       expect(script.timed_out?).to be false
     end
   end
+
+  describe 'advisory lock methods' do
+    describe '.acquire_lock' do
+      it 'returns true when lock is acquired' do
+        result = described_class.acquire_lock('test_script.rb')
+        expect(result).to be true
+      end
+
+      it 'returns false when lock cannot be acquired' do
+        # Skip for SQLite as it doesn't support advisory locks
+        if described_class.connection.adapter_name.downcase.include?('sqlite')
+          skip 'SQLite does not support advisory locks'
+        end
+
+        # First lock acquisition should succeed
+        lock1 = described_class.acquire_lock('test_script.rb')
+        expect(lock1).to be true
+
+        # Second lock acquisition should fail (lock already held)
+        lock2 = described_class.acquire_lock('test_script.rb')
+        expect(lock2).to be false
+
+        # Release the lock
+        described_class.release_lock('test_script.rb')
+      end
+
+      it 'generates consistent lock IDs for the same filename' do
+        lock_id1 = described_class.generate_lock_id('test.rb')
+        lock_id2 = described_class.generate_lock_id('test.rb')
+        expect(lock_id1).to eq(lock_id2)
+      end
+
+      it 'generates different lock IDs for different filenames' do
+        lock_id1 = described_class.generate_lock_id('test1.rb')
+        lock_id2 = described_class.generate_lock_id('test2.rb')
+        expect(lock_id1).not_to eq(lock_id2)
+      end
+    end
+
+    describe '.release_lock' do
+      it 'releases the acquired lock' do
+        described_class.acquire_lock('test_script.rb')
+        result = described_class.release_lock('test_script.rb')
+        expect([true, nil]).to include(result) # Different adapters return different values
+
+        # Should be able to acquire again
+        lock = described_class.acquire_lock('test_script.rb')
+        expect(lock).to be true
+        described_class.release_lock('test_script.rb')
+      end
+    end
+
+    describe '.with_advisory_lock' do
+      it 'executes the block when lock is acquired' do
+        executed = false
+        result = described_class.with_advisory_lock('test_script.rb') do
+          executed = true
+        end
+
+        expect(executed).to be true
+        expect(result).not_to eq({ success: false, locked: false })
+      end
+
+      it 'returns locked: false when lock cannot be acquired' do
+        # Skip for SQLite as it doesn't support advisory locks
+        if described_class.connection.adapter_name.downcase.include?('sqlite')
+          skip 'SQLite does not support advisory locks'
+        end
+
+        described_class.acquire_lock('test_script.rb')
+
+        result = described_class.with_advisory_lock('test_script.rb') do
+          # This should not execute
+        end
+
+        expect(result).to eq({ success: false, locked: false })
+
+        # Clean up
+        described_class.release_lock('test_script.rb')
+      end
+
+      it 'releases lock even if block raises an exception' do
+        expect do
+          described_class.with_advisory_lock('test_script.rb') do
+            raise StandardError, 'Test error'
+          end
+        end.to raise_error(StandardError, 'Test error')
+
+        # Lock should be released, so we can acquire it again
+        lock = described_class.acquire_lock('test_script.rb')
+        expect(lock).to be true
+        described_class.release_lock('test_script.rb')
+      end
+    end
+  end
 end

@@ -1,0 +1,76 @@
+AllCops:
+  TargetRubyVersion: 2.7
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'bin/**/*'
+    - 'vendor/**/*'
+    - 'node_modules/**/*'
+    - 'tmp/**/*'
+    - 'pkg/**/*'
+    - '.ruby-lsp/**/*'
+    - 'templates/**/*'  # ERB templates have special syntax
+
+# Metrics
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+    - 'tasks/**/*.rake'
+    - '*.gemspec'
+
+Metrics/MethodLength:
+  Max: 25
+  Exclude:
+    - 'spec/**/*'
+  AllowedMethods:
+    - run  # Core execution method needs more lines for proper error handling
+
+Metrics/AbcSize:
+  Max: 20
+  Exclude:
+    - 'spec/**/*'
+    - 'tasks/**/*.rake'
+  AllowedMethods:
+    - run  # Core execution method with complex branching
+    - acquire_lock  # Multi-database compatibility requires branching
+
+Metrics/ClassLength:
+  Max: 140  # Allow slightly longer for ActiveRecord models with multiple concerns
+
+# Gemspec
+Gemspec/DevelopmentDependencies:
+  Enabled: false  # We use both gemspec and Gemfile for development dependencies
+
+# Lint
+Lint/EmptyBlock:
+  Exclude:
+    - 'spec/**/*'  # Empty blocks are sometimes intentional in tests
+
+Metrics/CyclomaticComplexity:
+  Max: 10
+
+Metrics/PerceivedComplexity:
+  Max: 10
+
+# Layout
+Layout/LineLength:
+  Max: 120
+  Exclude:
+    - 'spec/**/*'
+
+# Style
+Style/Documentation:
+  Enabled: false  # Not requiring class documentation for now
+
+Style/StringLiterals:
+  EnforcedStyle: single_quotes
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/NumericPredicate:
+  EnforcedStyle: comparison
+
+Style/NestedTernaryOperator:
+  Enabled: true

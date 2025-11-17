@@ -17,14 +17,15 @@ namespace :scripts do
     scripts_dir = ScriptTracker.scripts_path
     file_path = scripts_dir.join(filename)
 
-    FileUtils.mkdir_p(scripts_dir) unless Dir.exist?(scripts_dir)
+    FileUtils.mkdir_p(scripts_dir)
 
     template = File.read(File.expand_path('../templates/script_template.rb', __dir__))
+    timestamp_str = Time.current.strftime('%Y-%m-%d %H:%M:%S')
     content = template.gsub('<%= filename %>', filename)
                       .gsub('<%= description %>', description)
                       .gsub('<%= class_name %>', class_name)
                       .gsub('<%= Time.current.year %>', Time.current.year.to_s)
-                      .gsub('<%= Time.current.strftime(\'%Y-%m-%d %H:%M:%S\') %>', Time.current.strftime('%Y-%m-%d %H:%M:%S'))
+                      .gsub('<%= Time.current.strftime(\'%Y-%m-%d %H:%M:%S\') %>', timestamp_str)
 
     File.write(file_path, content)
 
@@ -43,7 +44,7 @@ namespace :scripts do
 
     unless Dir.exist?(scripts_dir)
       puts "Error: Scripts directory does not exist: #{scripts_dir}"
-      puts "Please run: rails generate script_tracker:install"
+      puts 'Please run: rails generate script_tracker:install'
       exit 1
     end
 
@@ -63,9 +64,17 @@ namespace :scripts do
       script_name = File.basename(script_path)
       puts "[#{index + 1}/#{pending_scripts.count}] Running #{script_name}..."
 
-      begin
-        # Load script file
+      # Try to acquire lock for this script
+      lock_result = ScriptTracker::ExecutedScript.with_advisory_lock(script_name) do
+        # Load script file using `load` (not `require`) because:
+        # 1. Scripts are one-off files that should be loaded fresh each time
+        # 2. Allows script modifications to be picked up without restart
+        # 3. Scripts are not part of Rails autoload paths
+        # Suppress warnings about already initialized constants
+        original_verbosity = $VERBOSE
+        $VERBOSE = nil
         load script_path
+        $VERBOSE = original_verbosity
 
         # Extract and validate class name
         class_name = script_name.gsub(/^\d+_/, '').gsub('.rb', '').camelize
@@ -128,11 +137,21 @@ namespace :scripts do
         puts "Error: Syntax error in script #{script_name}: #{e.message}"
         failed_count += 1
       rescue StandardError => e
-        duration = Time.current - start_time rescue 0
+        duration = begin
+          (Time.current - start_time)
+        rescue StandardError
+          0
+        end
         error_message = "#{e.class}: #{e.message}"
         executed_script&.mark_failed!(error_message, duration)
         puts "Error: #{e.message}\n\n"
         failed_count += 1
+      end
+
+      # Check if lock was not acquired
+      if lock_result == { success: false, locked: false }
+        puts "Skipped: Another process is already running #{script_name}\n\n"
+        skipped_count += 1
       end
     end
 
@@ -147,7 +166,7 @@ namespace :scripts do
 
     unless Dir.exist?(scripts_dir)
       puts "Error: Scripts directory does not exist: #{scripts_dir}"
-      puts "Please run: rails generate script_tracker:install"
+      puts 'Please run: rails generate script_tracker:install'
       exit 1
     end
 
@@ -156,7 +175,7 @@ namespace :scripts do
 
     if script_files.empty?
       puts "\nNo scripts found in #{scripts_dir}"
-      puts "Create a script with: rake scripts:create[\"description\"]"
+      puts 'Create a script with: rake scripts:create["description"]'
       exit 0
     end
 
@@ -164,7 +183,13 @@ namespace :scripts do
     script_files.each do |file|
       filename = File.basename(file)
       if (script = executed_scripts[filename])
-        status_icon = script.success? ? '[SUCCESS]' : script.failed? ? '[FAILED]' : script.skipped? ? '[SKIPPED]' : '[RUNNING]'
+        status_icon = if script.success?
+                        '[SUCCESS]'
+                      elsif script.failed?
+                        '[FAILED]'
+                      else
+                        script.skipped? ? '[SKIPPED]' : '[RUNNING]'
+                      end
         puts "  #{status_icon} #{filename} (#{script.formatted_duration})"
       else
         puts "  [PENDING] #{filename}"
