@@ -1,0 +1,22 @@
+===============================================================================
+
+ScriptTracker has been installed!
+
+Next steps:
+
+1. Run the migration:
+   rails db:migrate
+
+2. Create your first script:
+   rake scripts:create["your script description"]
+
+3. Run pending scripts:
+   rake scripts:run
+
+4. Check scripts status:
+   rake scripts:status
+
+For more information, visit:
+https://github.com/blink-global/script_tracker
+
+===============================================================================

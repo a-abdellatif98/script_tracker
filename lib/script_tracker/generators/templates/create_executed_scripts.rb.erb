@@ -1,0 +1,17 @@
+class CreateExecutedScripts < ActiveRecord::Migration[<%= ActiveRecord::Migration.current_version %>]
+  def change
+    create_table :executed_scripts<%= primary_key_type == ":uuid" ? ", id: :uuid" : "" %> do |t|
+      t.string :filename, null: false
+      t.datetime :executed_at, null: false
+      t.string :status, null: false, default: 'running'
+      t.text :output
+      t.float :duration
+      t.integer :timeout
+      t.timestamps
+    end
+
+    add_index :executed_scripts, :filename, unique: true
+    add_index :executed_scripts, :status
+    add_index :executed_scripts, :executed_at
+  end
+end
