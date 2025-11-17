@@ -1,70 +1,35 @@
 # ScriptTracker
 
-ScriptTracker is a Ruby gem that provides a migration-like system for managing one-off scripts in Rails applications. It tracks script execution history, provides transaction support, and includes built-in logging and progress tracking.
+A Ruby gem that provides a migration-like system for managing one-off scripts in Rails applications with execution tracking, transaction support, and built-in logging.
 
 ## Features
 
-* **Execution Tracking**: Automatically tracks which scripts have been run and their status
-* **Transaction Support**: Wraps script execution in database transactions
-* **Status Management**: Track scripts as success, failed, running, or skipped
-* **Built-in Logging**: Convenient logging methods with timestamps
-* **Batch Processing**: Helper methods for processing large datasets efficiently
-* **Timeout Support**: Configure custom timeouts for long-running scripts
-* **Stale Script Cleanup**: Automatically identify and cleanup stuck scripts
-* **Migration Generator**: Generate timestamped script files with templates
+* **Execution Tracking** - Automatically tracks which scripts have been run and their status
+* **Transaction Support** - Wraps script execution in database transactions
+* **Status Management** - Track scripts as success, failed, running, or skipped
+* **Built-in Logging** - Convenient logging methods with timestamps
+* **Batch Processing** - Helper methods for processing large datasets efficiently
+* **Timeout Support** - Configure custom timeouts for long-running scripts
 
 ## Installation
 
-Add this line to your application's Gemfile:
+Add to your Gemfile:
 
 ```ruby
 gem 'script_tracker'
 ```
 
-And then execute:
+Then run:
 
 ```bash
 bundle install
-```
-
-Or install it yourself as:
-
-```bash
-gem install script_tracker
-```
-
-## Setup
-
-1. Install the gem using the generator:
-
-```bash
 rails generate script_tracker:install
-```
-
-This will:
-* Create a migration for the `executed_scripts` table
-* Create the `lib/scripts` directory for your scripts
-
-2. Run the migration:
-
-```bash
 rails db:migrate
 ```
 
-3. (Optional) Configure the scripts directory in an initializer:
+## Quick Start
 
-```ruby
-# config/initializers/script_tracker.rb
-ScriptTracker.configure do |config|
-  config.scripts_path = Rails.root.join('lib', 'scripts')
-end
-```
-
-## Usage
-
-### Creating a New Script
-
-Generate a new script with a descriptive name:
+### Create a Script
 
 ```bash
 rake scripts:create["update user preferences"]
@@ -73,136 +38,71 @@ rake scripts:create["update user preferences"]
 This creates a timestamped script file in `lib/scripts/` :
 
 ```ruby
-# lib/scripts/20231117120000_update_user_preferences.rb
 module Scripts
   class UpdateUserPreferences < ScriptTracker::Base
     def self.execute
-      log "Starting script: update user preferences"
-
-      # Your script logic here
+      log "Starting script"
+      
       User.find_each do |user|
         user.update!(preferences: { theme: 'dark' })
       end
-
-      log "Script completed successfully"
+      
+      log "Script completed"
     end
   end
 end
 ```
 
-### Running Scripts
-
-Run all pending (not yet executed) scripts:
+### Run Scripts
 
 ```bash
-rake scripts:run
+rake scripts:run        # Run all pending scripts
+rake scripts:status     # View script status
+rake scripts:rollback[filename]  # Rollback a script
+rake scripts:cleanup    # Cleanup stale scripts
 ```
 
-### Checking Script Status
+## Advanced Usage
 
-View the status of all scripts:
-
-```bash
-rake scripts:status
-```
-
-Output:
-
-```
-Scripts:
-  [SUCCESS] 20231117120000_update_user_preferences.rb (2.5s)
-  [PENDING] 20231117130000_cleanup_old_data.rb
-```
-
-### Rolling Back a Script
-
-Remove a script from execution history (allows it to be run again):
-
-```bash
-rake scripts:rollback[20231117120000_update_user_preferences.rb]
-```
-
-### Cleaning Up Stale Scripts
-
-Mark scripts stuck in "running" status as failed:
-
-```bash
-rake scripts:cleanup
-```
-
-## Advanced Features
-
-### Skipping Scripts
-
-Skip a script execution conditionally:
+### Skip Script Conditionally
 
 ```ruby
-module Scripts
-  class ConditionalUpdate < ScriptTracker::Base
-    def self.execute
-      if User.where(needs_update: true).count.zero?
-        skip! "No users need updating"
-      end
-
-      # Your script logic here
-    end
-  end
+def self.execute
+  skip! "No users need updating" if User.where(needs_update: true).count.zero?
+  # Your logic here
 end
 ```
 
 ### Custom Timeout
 
-Override the default 5-minute timeout:
-
 ```ruby
-module Scripts
-  class LongRunningScript < ScriptTracker::Base
-    def self.timeout
-      3600 # 1 hour in seconds
-    end
-
-    def self.execute
-      # Long-running logic here
-    end
-  end
+def self.timeout
+  3600 # 1 hour in seconds
 end
 ```
 
 ### Batch Processing
 
-Process large datasets efficiently:
-
 ```ruby
-module Scripts
-  class ProcessUsers < ScriptTracker::Base
-    def self.execute
-      users = User.where(processed: false)
-
-      process_in_batches(users, batch_size: 1000) do |user|
-        user.update!(processed: true)
-      end
-    end
+def self.execute
+  users = User.where(processed: false)
+  process_in_batches(users, batch_size: 1000) do |user|
+    user.update!(processed: true)
   end
 end
 ```
 
 ### Progress Logging
 
-Track progress during execution:
-
 ```ruby
-module Scripts
-  class DataMigration < ScriptTracker::Base
-    def self.execute
-      total = User.count
-      processed = 0
-
-      User.find_each do |user|
-        # Process user
-        processed += 1
-        log_progress(processed, total) if (processed % 100).zero?
-      end
-    end
+def self.execute
+  total = User.count
+  processed = 0
+  
+  User.find_each do |user|
+    # Process user
+    processed += 1
+    log_progress(processed, total) if (processed % 100).zero?
   end
 end
 ```
@@ -211,48 +111,21 @@ end
 
 ### ScriptTracker:: Base
 
-Base class for all scripts.
-
 **Class Methods:**
-
-* `execute` - Implement this method with your script logic (required)
-* `run` - Execute the script with transaction and error handling
+* `execute` - Implement with your script logic (required)
 * `timeout` - Override to set custom timeout (default: 300 seconds)
-* `skip!(reason)` - Skip script execution with optional reason
-* `log(message, level: :info)` - Log a message with timestamp
-* `log_progress(current, total, message = nil)` - Log progress percentage
-* `process_in_batches(relation, batch_size: 1000, &block)` - Process records in batches
+* `skip!(reason)` - Skip script execution
+* `log(message, level: :info)` - Log a message
+* `log_progress(current, total)` - Log progress percentage
+* `process_in_batches(relation, batch_size: 1000, &block)` - Process in batches
 
 ### ScriptTracker:: ExecutedScript
 
-ActiveRecord model for tracking script execution.
-
-**Scopes:**
-
-* `successful` - Scripts that completed successfully
-* `failed` - Scripts that failed
-* `running` - Scripts currently running
-* `skipped` - Scripts that were skipped
-* `completed` - Scripts that finished (success or failed)
-* `ordered` - Order by execution time ascending
-* `recent_first` - Order by execution time descending
+**Scopes:** `successful` , `failed` , `running` , `skipped` , `completed` , `ordered` , `recent_first`
 
 **Class Methods:**
-
-* `executed?(filename)` - Check if a script has been executed
-* `mark_as_running(filename)` - Mark a script as running
+* `executed?(filename)` - Check if script has been executed
 * `cleanup_stale_running_scripts(older_than: 1.hour.ago)` - Clean up stale scripts
-
-**Instance Methods:**
-
-* `mark_success!(output, duration)` - Mark as successful
-* `mark_failed!(error, duration)` - Mark as failed
-* `mark_skipped!(output, duration)` - Mark as skipped
-* `success?`,     `failed?`,     `running?`,  `skipped?` - Status predicates
-* `formatted_duration` - Human-readable duration
-* `formatted_output` - Truncated output text
-* `timeout_seconds` - Get timeout value
-* `timed_out?` - Check if script has timed out
 
 ## Rake Tasks
 
@@ -262,68 +135,33 @@ ActiveRecord model for tracking script execution.
 * `rake scripts:rollback[filename]` - Rollback a script
 * `rake scripts:cleanup` - Cleanup stale running scripts
 
-## Development
+## Releasing
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests.
+### GitHub Actions (Recommended)
 
-To install this gem onto your local machine, run `bundle exec rake install` .
+1. Go to **Actions** → **Release** workflow
+2. Click **Run workflow**
+3. Enter version number (e.g., `0.1.3`)
 
-### Releasing a New Version
-
-#### Option 1: GitHub Actions (Recommended)
-
-The easiest way to release is using GitHub Actions:
-
-1. Go to the **Actions** tab in GitHub
-2. Select **Release** workflow
-3. Click **Run workflow**
-4. Enter the version number (e.g., `0.1.1`)
-5. Click **Run workflow**
-
-The workflow will:
-* Run all tests across multiple Ruby versions
-* Update version and CHANGELOG
-* Build the gem
-* Create git tag
-* Push to git
-* Push to RubyGems automatically
-
-**Required Secrets**: Set `RUBYGEMS_AUTH_TOKEN` in GitHub repository secrets.
-
-#### Option 2: Local Release Script
-
-To release locally, use the release script:
+Or push a tag:
 
 ```bash
-bin/release 0.1.1
+git tag -a v0.1.3 -m "Release version 0.1.3"
+git push origin v0.1.3
 ```
 
-The release script will:
-* Run all tests to ensure everything passes
-* Update the version in `lib/script_tracker/version.rb`
-* Update `CHANGELOG.md` with the new version
-* Build the gem
-* Create a git tag
-* Push to git (if remote configured)
-* Push to RubyGems
+**Required:** Set `RUBYGEMS_AUTH_TOKEN` in GitHub repository secrets.
 
-**Note**: The script requires:
-* All tests passing
-* No uncommitted changes
-* RubyGems credentials configured (`gem credentials`)
-
-#### Option 3: Rake Task
-
-Alternatively, you can use the rake task:
+### Local Release
 
 ```bash
-bundle exec rake release
+bin/release 0.1.3
 ```
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/a-abdellatif98/script_tracker.
+Bug reports and pull requests welcome at https://github.com/a-abdellatif98/script_tracker.
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
+MIT License - see LICENSE file for details.

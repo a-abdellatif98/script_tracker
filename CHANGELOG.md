@@ -7,12 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2025-01-17
+
+### Changed
+- Simplified and streamlined README documentation
+- Cleaned up CHANGELOG format
+
 ## [0.1.2] - 2025-01-17
 
 ### Fixed
-- Updated GitHub Actions workflows to use v4 actions (fix deprecated upload-artifact)
+- Updated GitHub Actions workflows to use v4 actions
+- Fixed GitHub release permissions
 - Refactored workflows to match successful gem release pattern
-- Fixed RubyGems authentication configuration
 
 ## [0.1.1] - 2025-01-17
 
@@ -22,29 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manual release workflow via GitHub Actions UI
 - Local release script (`bin/release`)
 
-### Changed
-- Improved workflow documentation in README
-
 ## [0.1.0] - 2025-01-17
 
 ### Added
-- Initial release of ScriptTracker
+- Initial release
 - Script execution tracking with status management
 - Transaction support for script execution
 - Built-in logging and progress tracking
 - Batch processing helpers
 - Timeout support for long-running scripts
 - Stale script cleanup functionality
-- Rake tasks for managing scripts:
-  - `scripts:create` - Create new scripts
-  - `scripts:run` - Run pending scripts
-  - `scripts:status` - View script status
-  - `scripts:rollback` - Rollback scripts
-  - `scripts:cleanup` - Cleanup stale scripts
+- Rake tasks for managing scripts
 - Comprehensive RSpec test suite
-- Full documentation and examples
 
-[Unreleased]: https://github.com/a-abdellatif98/script_tracker/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/a-abdellatif98/script_tracker/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/a-abdellatif98/script_tracker/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/a-abdellatif98/script_tracker/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/a-abdellatif98/script_tracker/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/a-abdellatif98/script_tracker/releases/tag/v0.1.0
