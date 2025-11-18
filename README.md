@@ -158,6 +158,92 @@ git push origin v0.1.3
 bin/release 0.1.3
 ```
 
+## Similar Gems
+
+Choosing the right tool for your data migration needs depends on your use case. Here's how ScriptTracker compares to other popular solutions:
+
+### vs. data_migrate
+
+**data_migrate** runs data migrations alongside schema migrations using a `db/data` directory.
+
+| Feature | ScriptTracker | data_migrate |
+|---------|--------------|--------------|
+| **Integration** | Standalone script system with dedicated rake tasks | Integrates directly with `rails db:migrate` |
+| **Execution Tracking** | Rich status tracking (success/failed/running/skipped) | Simple executed/not executed |
+| **Transaction Support** | Built-in with automatic rollback on failure | Depends on migration implementation |
+| **Rollback** | Dedicated rollback command with custom logic | Standard Rails migration rollback |
+| **Logging** | Built-in logging helpers with timestamps | Standard Rails logger |
+| **Batch Processing** | Helper methods included | Manual implementation |
+| **Timeout Support** | Configurable per script | Not included |
+| **Best For** | One-off maintenance scripts and data fixes | Keeping data migrations in sync with schema changes |
+
+**When to choose data_migrate:** You want data migrations to run automatically with schema migrations in your deployment pipeline.
+
+**When to choose ScriptTracker:** You need more control over one-off scripts with detailed tracking, rollback capabilities, and don't want them tied to your schema migration workflow.
+
+### vs. maintenance_tasks (Shopify)
+
+**maintenance_tasks** is a Rails engine providing a web UI for queueing and managing long-running data migrations.
+
+| Feature | ScriptTracker | maintenance_tasks |
+|---------|--------------|-------------------|
+| **Web UI** | Command-line only | Full web interface for managing tasks |
+| **Job Backend** | Direct execution | Active Job integration |
+| **Interruptibility** | Not supported | Tasks can pause and resume across deploys |
+| **Throttling** | Not supported | Built-in throttling with backoff |
+| **CSV Processing** | Manual implementation | Built-in CSV upload and processing |
+| **Complexity** | Lightweight, minimal dependencies | Heavier, requires mounting engine and UI |
+| **Learning Curve** | Simple, migration-like syntax | More setup, additional concepts |
+| **Best For** | Simple one-off scripts, small teams | Production-grade tasks, large teams, complex workflows |
+
+**When to choose maintenance_tasks:** You need a robust UI for non-technical users, want tasks to survive deploys/restarts, or need advanced features like throttling.
+
+**When to choose ScriptTracker:** You prefer simplicity, want CLI-based workflow, or don't need the overhead of a web UI and Active Job.
+
+### vs. after_party
+
+**after_party** automates post-deploy tasks that run once per environment.
+
+| Feature | ScriptTracker | after_party |
+|---------|--------------|-------------|
+| **Execution Model** | Manual or automated via rake | Automatic on deployment |
+| **Status Tracking** | Rich status (success/failed/running/skipped) | Binary executed/not executed |
+| **Rollback Support** | Dedicated rollback with custom logic | No rollback support |
+| **Skip Logic** | Built-in `skip!` method | Manual implementation |
+| **Logging** | Built-in helpers with timestamps | Manual implementation |
+| **Batch Processing** | Helper methods included | Manual implementation |
+| **Progress Tracking** | `log_progress` helper | Manual implementation |
+| **Best For** | Managed execution with detailed tracking | Fire-and-forget deployment tasks |
+
+**When to choose after_party:** You want tasks to run automatically after each deployment with minimal configuration.
+
+**When to choose ScriptTracker:** You need more visibility, control, and features like rollback, status tracking, and skip logic.
+
+### Quick Decision Guide
+
+Choose **ScriptTracker** if you want:
+- Rich execution tracking with detailed status
+- Built-in logging, batch processing, and progress tracking
+- Rollback capabilities for one-off scripts
+- CLI-based workflow without web UI overhead
+- Transaction support with automatic rollback on failure
+
+Choose **data_migrate** if you want:
+- Data migrations that run with schema migrations
+- Integration with existing Rails migration workflow
+- Automatic execution during deployments
+
+Choose **maintenance_tasks** if you want:
+- Web UI for managing tasks
+- Tasks that survive deploys and restarts
+- Advanced features (throttling, CSV processing)
+- Production-grade task management for large teams
+
+Choose **after_party** if you want:
+- Simple post-deploy automation
+- Fire-and-forget task execution
+- Minimal configuration and setup
+
 ## Contributing
 
 Bug reports and pull requests welcome at https://github.com/a-abdellatif98/script_tracker.
