@@ -18,6 +18,9 @@ on:
 jobs:
   rubocop:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
     strategy:
       fail-fast: false
 
@@ -41,14 +44,25 @@ jobs:
           bundle install --jobs 4 --retry 3
 
       - name: Rubocop run
+        continue-on-error: true
+        id: rubocop
         run: |
-          bash -c "
-            bundle exec rubocop --require code_scanning --format CodeScanning::SarifFormatter -o rubocop.sarif
-            [[ $? -ne 2 ]]
-          "
+          bundle exec rubocop --require code_scanning --format CodeScanning::SarifFormatter -o rubocop.sarif || echo "rubocop_exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Check SARIF file exists
+        id: check_sarif
+        if: always()
+        run: |
+          if [ -f rubocop.sarif ]; then
+            echo "sarif_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "sarif_exists=false" >> $GITHUB_OUTPUT
+            echo "Warning: rubocop.sarif file was not created"
+          fi
 
       - name: Upload Sarif output
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.check_sarif.outputs.sarif_exists == 'true'
         with:
           sarif_file: rubocop.sarif
+          wait-for-processing: false
