@@ -1,4 +1,5 @@
 # ScriptTracker
+[![SkillShield](https://skillshield.io/api/v1/badge/eedfbc01c0645220.svg)](https://skillshield.io/report/eedfbc01c0645220)
 
 A Ruby gem that provides a migration-like system for managing one-off scripts in Rails applications with execution tracking, transaction support, and built-in logging.
 
