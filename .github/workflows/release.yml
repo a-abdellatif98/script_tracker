@@ -61,11 +61,16 @@ jobs:
           bundle install
 
       - name: Update version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          ruby -i -pe "gsub(/VERSION = \".*\"/, \"VERSION = \\\"$VERSION\\\"\")" lib/script_tracker/version.rb
+          ruby -i -pe 'gsub(/VERSION = ["\x27][^"\x27]*["\x27]/, %(VERSION = \x27#{ENV["VERSION"]}\x27))' lib/script_tracker/version.rb
+          ACTUAL=$(ruby -e "require_relative 'lib/script_tracker/version'; puts ScriptTracker::VERSION")
+          if [ "$ACTUAL" != "$VERSION" ]; then
+            echo "ERROR: version.rb has $ACTUAL, expected $VERSION"
+            exit 1
+          fi
           echo "Updated version to $VERSION"
-          cat lib/script_tracker/version.rb
 
       - name: Update CHANGELOG
         run: |
@@ -110,6 +115,11 @@ jobs:
           gem push ${{ env.GEM_FILE }}
         env:
           RUBYGEMS_AUTH_TOKEN: ${{ secrets.RUBYGEMS_AUTH_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        run: gem push --host "https://rubygems.pkg.github.com/${{ github.repository_owner }}" ${{ env.GEM_FILE }}
+        env:
+          GEM_HOST_API_KEY: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload gem artifact
         uses: actions/upload-artifact@v4
