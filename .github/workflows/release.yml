@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        ruby-version: ["3.2", "3.3"]
+        ruby-version: ["3.2", "3.3", "3.4"]
 
     steps:
       - uses: actions/checkout@v4
@@ -44,7 +44,17 @@ jobs:
       contents: write
       packages: write
 
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+
     steps:
+      - name: Validate version input
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$ ]]; then
+            echo "ERROR: invalid version '$VERSION'"
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -62,16 +72,17 @@ jobs:
 
       - name: Update version
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          ruby -i -pe "gsub(/VERSION = \".*\"/, \"VERSION = \\\"$VERSION\\\"\")" lib/script_tracker/version.rb
+          ruby -i -pe 'gsub(/VERSION = ["\x27][^"\x27]*["\x27]/, %(VERSION = \x27#{ENV["VERSION"]}\x27))' lib/script_tracker/version.rb
+          ACTUAL=$(ruby -e "require_relative 'lib/script_tracker/version'; puts ScriptTracker::VERSION")
+          if [ "$ACTUAL" != "$VERSION" ]; then
+            echo "ERROR: version.rb has $ACTUAL, expected $VERSION"
+            exit 1
+          fi
           echo "Updated version to $VERSION"
-          cat lib/script_tracker/version.rb
 
       - name: Update CHANGELOG
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          DATE=$(date +%Y-%m-%d)
-          ruby -i -pe "gsub(/## \[Unreleased\]/, \"## [Unreleased]\\n\\n## [$VERSION] - $DATE\\n\\n### Added\\n- Release $VERSION\\n\")" CHANGELOG.md
+          DATE=$(date +%Y-%m-%d) ruby -i -pe 'gsub(/## \[Unreleased\]/, "## [Unreleased]\n\n## [#{ENV["VERSION"]}] - #{ENV["DATE"]}\n\n### Added\n- Release #{ENV["VERSION"]}\n")' CHANGELOG.md
           echo "Updated CHANGELOG.md"
 
       - name: Run RuboCop
@@ -90,8 +101,8 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add lib/script_tracker/version.rb CHANGELOG.md
-          git commit -m "Bump version to ${{ github.event.inputs.version }}" || echo "No changes to commit"
-          git tag -a "v${{ github.event.inputs.version }}" -m "Release version ${{ github.event.inputs.version }}"
+          git commit -m "Bump version to $VERSION" || echo "No changes to commit"
+          git tag -a "v$VERSION" -m "Release version $VERSION"
 
       - name: Push to git
         env:
@@ -99,7 +110,7 @@ jobs:
         run: |
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git push origin main || echo "Nothing to push"
-          git push origin "v${{ github.event.inputs.version }}"
+          git push origin "v$VERSION"
 
       - name: Publish to RubyGems
         run: |
@@ -110,6 +121,11 @@ jobs:
           gem push ${{ env.GEM_FILE }}
         env:
           RUBYGEMS_AUTH_TOKEN: ${{ secrets.RUBYGEMS_AUTH_TOKEN }}
+
+      - name: Publish to GitHub Packages
+        run: gem push --host "https://rubygems.pkg.github.com/${{ github.repository_owner }}" ${{ env.GEM_FILE }}
+        env:
+          GEM_HOST_API_KEY: "Bearer ${{ secrets.GITHUB_TOKEN }}"
 
       - name: Upload gem artifact
         uses: actions/upload-artifact@v4
