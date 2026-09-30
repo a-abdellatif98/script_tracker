@@ -33,11 +33,12 @@ Chosen: **fix the version pattern and add a GitHub Packages push step**, because
 
 ## Consequences
 
-- The version pattern must match both quote styles, for example `VERSION = ['"].*['"]`.
+- The version pattern matches both quote styles: `VERSION = ["'][^"']*["']`. The job fails if `version.rb` does not equal the input.
+- The release job validates the version input format and passes it to each step through `env`.
 - The release job pushes the built gem to `https://rubygems.pkg.github.com/a-abdellatif98` with `GITHUB_TOKEN`. The job already has `packages: write`.
 - The redundant `Rubocop` workflow can stay disabled or be deleted.
 - Minor dev dependency updates (rake, rubocop, rubocop-rspec, sqlite3) are optional.
 
 ## Artifacts
 
-- TBD: commit or PR link.
+- https://github.com/a-abdellatif98/script_tracker/pull/2
